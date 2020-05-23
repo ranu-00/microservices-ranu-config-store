@@ -1,6 +1,6 @@
 spring:
    datasource:
-      url: jdbc:mysql://localhost:3306/microservices
+      url: jdbc:mysql://localhost:3306/chatmessage?createDatabaseIfNotExist=true
       username: root
       password: Micro@123
       driver-classs-name: com.mysql.jdbc.Driver     
