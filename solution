@@ -1,34 +1,27 @@
-const STORAGE_KEY = 'tab-alive';
     const TAB_ID = Date.now() + '_' + Math.random();
-
+    const CHECK_KEY = 'tab-check-ping';
+    const RESPONSE_KEY = 'tab-check-response';
     let isDuplicate = false;
 
-    function notifyOtherTabs() {
-      // Trigger other tabs to respond
-      localStorage.setItem('tab-ping', TAB_ID);
-    }
+    // Only the new tab sends the ping
+    localStorage.setItem(CHECK_KEY, TAB_ID);
 
-    function handleStorageEvent(e) {
-      if (e.key === 'tab-ping') {
-        // Another tab is asking if anyone's alive
-        // Respond with our own ID
-        localStorage.setItem(STORAGE_KEY, TAB_ID);
-      } else if (e.key === STORAGE_KEY && e.newValue !== TAB_ID) {
-        // We received a response: another tab is alive
+    window.addEventListener('storage', (e) => {
+      if (e.key === RESPONSE_KEY && e.newValue !== TAB_ID) {
+        // Another tab responded → this is a duplicate tab
         isDuplicate = true;
-        alert('Duplicate tab detected (this tab is the duplicate)');
+        alert('🚨 This tab is a duplicate!');
       }
-    }
 
-    window.addEventListener('storage', handleStorageEvent);
+      if (e.key === CHECK_KEY && e.newValue !== TAB_ID) {
+        // A new tab is checking for duplicates → respond
+        localStorage.setItem(RESPONSE_KEY, e.newValue);
+      }
+    });
 
-    // Step 1: Ping other tabs
-    notifyOtherTabs();
-
-    // Step 2: Wait briefly to see if someone responds
+    // Wait briefly to see if someone replies
     setTimeout(() => {
       if (!isDuplicate) {
-        // No one responded — we're the first tab
-        localStorage.setItem(STORAGE_KEY, TAB_ID);
+        console.log('✅ This is the first (or only) tab.');
       }
-    }, 300); // 300ms is usually enough for round-trip communication
+    }, 300);
