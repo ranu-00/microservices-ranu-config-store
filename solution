@@ -1,21 +1,10 @@
 const TAB_ID = Date.now() + '_' + Math.random();
-const LEADER_KEY = 'tab-leader-id';
 const PING_KEY = 'tab-check-ping-' + TAB_ID;
 const RESPONSE_KEY = 'tab-check-response-' + TAB_ID;
 
 let isDuplicate = false;
 
-// Attempt to become the leader if there's no current leader
-if (!localStorage.getItem(LEADER_KEY)) {
-  localStorage.setItem(LEADER_KEY, TAB_ID);
-}
-
-// Function to check if we're the leader
-function isMainTab() {
-  return localStorage.getItem(LEADER_KEY) === TAB_ID;
-}
-
-// Ping other tabs
+// Ping other tabs to check if this is a duplicate
 localStorage.setItem(PING_KEY, 'ping');
 
 // Handle storage events
@@ -25,53 +14,51 @@ window.addEventListener('storage', (e) => {
     const newTabId = e.key.substring('tab-check-ping-'.length);
     const newTabResponseKey = 'tab-check-response-' + newTabId;
 
-    // If we're the main tab, respond
-    if (isMainTab()) {
-      alert('🚨 A duplicate tab has been opened.');
-      localStorage.setItem(newTabResponseKey, 'duplicate');
-    }
+    // Show alert on main tab
+    alert('🚨 A duplicate tab has been opened.');
+
+    // Send response back to duplicate tab
+    localStorage.setItem(newTabResponseKey, 'duplicate');
   }
 
   // 2. If we are the duplicate tab and receive a response
   if (e.key === RESPONSE_KEY && e.newValue === 'duplicate') {
     isDuplicate = true;
     console.log('⚠️ This is a duplicate tab.');
+
+    // Submit hidden form (only on duplicate)
     submitHiddenForm();
   }
 
-  // 3. Conflict from another tab
+  // 3. Main tab is notified that a conflict happened in the duplicate
   if (e.key && e.key.startsWith('tab-conflict-')) {
-    alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
-  }
+    const dupTabId = e.key.substring('tab-conflict-'.length);
 
-  // 4. Leader tab closed (optional: elect a new leader)
-  if (e.key === LEADER_KEY && e.oldValue === TAB_ID) {
-    console.warn('🔁 Leader tab was closed or refreshed.');
+    // Alert the user on the main tab
+    alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
   }
 });
 
-// Final check
+// Check after brief timeout to confirm if this is the main tab
 setTimeout(() => {
   if (!isDuplicate) {
-    if (isMainTab()) {
-      console.log('✅ This is the main tab.');
-    } else {
-      console.log('⚠️ This tab is not the leader but received no duplicate notice.');
-    }
+    console.log('✅ This is the main tab.');
   }
 }, 300);
 
-// Simulate 409 conflict in duplicate tab
+// ➕ Simulate 409 response in duplicate tab after form submission
 window.addEventListener('load', () => {
   if (isDuplicate) {
+    // Simulate 409 response using a timeout (replace with real check if needed)
     setTimeout(() => {
+      console.warn('⚠️ Simulating 409 conflict due to duplicate tab.');
       const conflictKey = 'tab-conflict-' + TAB_ID;
       localStorage.setItem(conflictKey, '409');
     }, 1000);
   }
 });
 
-// Submit hidden form
+// 🔒 Hidden form submit logic
 function submitHiddenForm() {
   const form = document.createElement('form');
   form.style.display = 'none';
