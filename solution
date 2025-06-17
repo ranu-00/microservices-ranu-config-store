@@ -14,11 +14,14 @@ window.addEventListener('storage', (e) => {
     const newTabId = e.key.substring('tab-check-ping-'.length);
     const newTabResponseKey = 'tab-check-response-' + newTabId;
 
-    // Show alert on main tab
-    alert('🚨 A duplicate tab has been opened.');
+    // Only respond if this is NOT the new tab (i.e., if TAB_ID !== newTabId)
+    if (newTabId !== TAB_ID) {
+      // Show alert on main tab
+      alert('🚨 A duplicate tab has been opened.');
 
-    // Send response back to duplicate tab
-    localStorage.setItem(newTabResponseKey, 'duplicate');
+      // Send response back to duplicate tab
+      localStorage.setItem(newTabResponseKey, 'duplicate');
+    }
   }
 
   // 2. If we are the duplicate tab and receive a response
@@ -34,8 +37,10 @@ window.addEventListener('storage', (e) => {
   if (e.key && e.key.startsWith('tab-conflict-')) {
     const dupTabId = e.key.substring('tab-conflict-'.length);
 
-    // Alert the user on the main tab
-    alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
+    // Only alert if this is NOT the duplicate tab
+    if (dupTabId !== TAB_ID) {
+      alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
+    }
   }
 });
 
