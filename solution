@@ -2,81 +2,80 @@ const MAIN_TAB_KEY = 'main-tab-id';
 const TAB_ID = Date.now() + '_' + Math.random();
 const PING_KEY = 'tab-check-ping-' + TAB_ID;
 const RESPONSE_KEY = 'tab-check-response-' + TAB_ID;
-const CONFLICT_KEY = 'tab-conflict-' + TAB_ID;
 
 let isDuplicate = false;
 
-// 1. Try to become the main tab if no main exists
-if (!localStorage.getItem(MAIN_TAB_KEY)) {
+// 1. Check if a main tab exists
+const existingMainTabId = localStorage.getItem(MAIN_TAB_KEY);
+if (!existingMainTabId) {
+  // No main tab found — claim it
   localStorage.setItem(MAIN_TAB_KEY, TAB_ID);
-  console.log('✅ This is the main tab (assigned).');
+  console.log('✅ No main tab detected. This tab is now the main tab.');
 } else {
-  // Ping other tabs
-  console.log('⏳ Another main tab exists. Pinging to check for duplication...');
+  // Main tab exists — ping to check for duplication
+  console.log('ℹ️ Detected existing main tab. Pinging to confirm if duplicate.');
   localStorage.setItem(PING_KEY, 'ping');
 }
 
 // 2. Listen for storage events
 window.addEventListener('storage', (e) => {
-  // Main tab responds to ping
-  if (
-    e.key &&
-    e.key.startsWith('tab-check-ping-') &&
-    localStorage.getItem(MAIN_TAB_KEY) === TAB_ID
-  ) {
+  // Main tab receives ping
+  if (e.key && e.key.startsWith('tab-check-ping-')) {
     const newTabId = e.key.substring('tab-check-ping-'.length);
     const responseKey = 'tab-check-response-' + newTabId;
 
-    alert('🚨 A duplicate tab has been opened.');
-    localStorage.setItem(responseKey, 'duplicate');
+    if (localStorage.getItem(MAIN_TAB_KEY) === TAB_ID) {
+      // Only main tab responds
+      alert('🚨 A duplicate tab has been opened.');
+      localStorage.setItem(responseKey, 'duplicate');
+    }
   }
 
-  // This tab receives confirmation it's a duplicate
+  // Duplicate tab receives response
   if (e.key === RESPONSE_KEY && e.newValue === 'duplicate') {
-    handleDuplicate();
+    markAsDuplicate();
   }
 
-  // Main tab receives conflict from duplicate
-  if (e.key === 'tab-conflict-' + TAB_ID && localStorage.getItem(MAIN_TAB_KEY) === TAB_ID) {
+  // Main tab receives conflict signal
+  if (e.key === 'tab-conflict-' + TAB_ID) {
     alert('⚠️ A duplicate tab caused a conflict.');
   }
 });
 
-// 3. Retry in case no response is received
+// 3. Fallback after 500ms only if another main tab exists and no response was received
 setTimeout(() => {
-  const mainTabId = localStorage.getItem(MAIN_TAB_KEY);
-  if (!isDuplicate && mainTabId !== TAB_ID) {
-    console.warn('⏰ No response received. Assuming this is a duplicate.');
-    handleDuplicate(); // Treat self as duplicate
-  } else if (mainTabId === TAB_ID) {
-    console.log('✅ Confirmed: This is the main tab.');
+  const currentMainTabId = localStorage.getItem(MAIN_TAB_KEY);
+  if (!isDuplicate && currentMainTabId && currentMainTabId !== TAB_ID) {
+    console.warn('⏰ No response received. Assuming this tab is a duplicate.');
+    markAsDuplicate();
+  } else if (currentMainTabId === TAB_ID) {
+    console.log('✅ Confirmed as main tab.');
   }
 }, 500);
 
-// 4. Duplicate tab behavior
-function handleDuplicate() {
-  if (isDuplicate) return; // Prevent duplicate logic more than once
+// 4. Handle duplicate tab logic
+function markAsDuplicate() {
+  if (isDuplicate) return;
   isDuplicate = true;
 
   console.warn('⚠️ This is a duplicate tab. Submitting hidden form...');
-
   submitHiddenForm();
 
-  // Simulate conflict response (e.g. server returned 409)
+  // Simulate server conflict (e.g. 409)
   setTimeout(() => {
     const mainId = localStorage.getItem(MAIN_TAB_KEY);
-    if (mainId) {
+    if (mainId && mainId !== TAB_ID) {
       localStorage.setItem('tab-conflict-' + mainId, '409');
     }
   }, 1000);
 }
 
-// 5. Hidden form submit (only in duplicates)
+// 5. Hidden form submission (runs only in duplicates)
 function submitHiddenForm() {
   const form = document.createElement('form');
   form.style.display = 'none';
   form.method = 'POST';
-  form.action = '/submit-duplicate'; // Replace with your actual endpoint
+  form.action = '/submit-duplicate'; // Replace with your real endpoint
   document.body.appendChild(form);
   form.submit();
 }
