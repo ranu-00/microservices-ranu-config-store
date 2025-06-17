@@ -1,76 +1,77 @@
-const MAIN_TAB_KEY = 'main-tab-id';
 const TAB_ID = Date.now() + '_' + Math.random();
+const LEADER_KEY = 'tab-leader-id';
 const PING_KEY = 'tab-check-ping-' + TAB_ID;
 const RESPONSE_KEY = 'tab-check-response-' + TAB_ID;
 
 let isDuplicate = false;
 
-// 1. Check if a main tab exists
-const existingMainTabId = localStorage.getItem(MAIN_TAB_KEY);
-if (!existingMainTabId) {
-  // No main tab found — claim it
-  localStorage.setItem(MAIN_TAB_KEY, TAB_ID);
-  console.log('✅ No main tab detected. This tab is now the main tab.');
-} else {
-  // Main tab exists — ping to check for duplication
-  console.log('ℹ️ Detected existing main tab. Pinging to confirm if duplicate.');
-  localStorage.setItem(PING_KEY, 'ping');
+// Attempt to become the leader if there's no current leader
+if (!localStorage.getItem(LEADER_KEY)) {
+  localStorage.setItem(LEADER_KEY, TAB_ID);
 }
 
-// 2. Listen for storage events
+// Function to check if we're the leader
+function isMainTab() {
+  return localStorage.getItem(LEADER_KEY) === TAB_ID;
+}
+
+// Ping other tabs
+localStorage.setItem(PING_KEY, 'ping');
+
+// Handle storage events
 window.addEventListener('storage', (e) => {
-  // Main tab receives ping
+  // 1. Another tab pinged
   if (e.key && e.key.startsWith('tab-check-ping-')) {
     const newTabId = e.key.substring('tab-check-ping-'.length);
-    const responseKey = 'tab-check-response-' + newTabId;
+    const newTabResponseKey = 'tab-check-response-' + newTabId;
 
-    if (localStorage.getItem(MAIN_TAB_KEY) === TAB_ID) {
-      // Only main tab responds
+    // If we're the main tab, respond
+    if (isMainTab()) {
       alert('🚨 A duplicate tab has been opened.');
-      localStorage.setItem(responseKey, 'duplicate');
+      localStorage.setItem(newTabResponseKey, 'duplicate');
     }
   }
 
-  // Duplicate tab receives response
+  // 2. If we are the duplicate tab and receive a response
   if (e.key === RESPONSE_KEY && e.newValue === 'duplicate') {
-    markAsDuplicate();
+    isDuplicate = true;
+    console.log('⚠️ This is a duplicate tab.');
+    submitHiddenForm();
   }
 
-  // Main tab receives conflict signal
-  if (e.key === 'tab-conflict-' + TAB_ID) {
-    alert('⚠️ A duplicate tab caused a conflict.');
+  // 3. Conflict from another tab
+  if (e.key && e.key.startsWith('tab-conflict-')) {
+    alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
+  }
+
+  // 4. Leader tab closed (optional: elect a new leader)
+  if (e.key === LEADER_KEY && e.oldValue === TAB_ID) {
+    console.warn('🔁 Leader tab was closed or refreshed.');
   }
 });
 
-// 3. Fallback after 500ms only if another main tab exists and no response was received
+// Final check
 setTimeout(() => {
-  const currentMainTabId = localStorage.getItem(MAIN_TAB_KEY);
-  if (!isDuplicate && currentMainTabId && currentMainTabId !== TAB_ID) {
-    console.warn('⏰ No response received. Assuming this tab is a duplicate.');
-    markAsDuplicate();
-  } else if (currentMainTabId === TAB_ID) {
-    console.log('✅ Confirmed as main tab.');
-  }
-}, 500);
-
-// 4. Handle duplicate tab logic
-function markAsDuplicate() {
-  if (isDuplicate) return;
-  isDuplicate = true;
-
-  console.warn('⚠️ This is a duplicate tab. Submitting hidden form...');
-  submitHiddenForm();
-
-  // Simulate server conflict (e.g. 409)
-  setTimeout(() => {
-    const mainId = localStorage.getItem(MAIN_TAB_KEY);
-    if (mainId && mainId !== TAB_ID) {
-      localStorage.setItem('tab-conflict-' + mainId, '409');
+  if (!isDuplicate) {
+    if (isMainTab()) {
+      console.log('✅ This is the main tab.');
+    } else {
+      console.log('⚠️ This tab is not the leader but received no duplicate notice.');
     }
-  }, 1000);
-}
+  }
+}, 300);
 
-// 5. Hidden form submission (runs only in duplicates)
+// Simulate 409 conflict in duplicate tab
+window.addEventListener('load', () => {
+  if (isDuplicate) {
+    setTimeout(() => {
+      const conflictKey = 'tab-conflict-' + TAB_ID;
+      localStorage.setItem(conflictKey, '409');
+    }, 1000);
+  }
+});
+
+// Submit hidden form
 function submitHiddenForm() {
   const form = document.createElement('form');
   form.style.display = 'none';
