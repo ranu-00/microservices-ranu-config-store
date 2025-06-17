@@ -14,7 +14,7 @@ window.addEventListener('storage', (e) => {
     const newTabId = e.key.substring('tab-check-ping-'.length);
     const newTabResponseKey = 'tab-check-response-' + newTabId;
 
-    // Only respond if this is NOT the new tab (i.e., if TAB_ID !== newTabId)
+    // Only respond if this is NOT the tab that just pinged (i.e., not the new tab itself)
     if (newTabId !== TAB_ID) {
       // Show alert on main tab
       alert('🚨 A duplicate tab has been opened.');
@@ -26,11 +26,12 @@ window.addEventListener('storage', (e) => {
 
   // 2. If we are the duplicate tab and receive a response
   if (e.key === RESPONSE_KEY && e.newValue === 'duplicate') {
-    isDuplicate = true;
-    console.log('⚠️ This is a duplicate tab.');
-
-    // Submit hidden form (only on duplicate)
-    submitHiddenForm();
+    // Only the duplicate tab should run this logic for itself
+    if (!isDuplicate) {
+      isDuplicate = true;
+      console.log('⚠️ This is a duplicate tab.');
+      submitHiddenForm();
+    }
   }
 
   // 3. Main tab is notified that a conflict happened in the duplicate
@@ -48,6 +49,7 @@ window.addEventListener('storage', (e) => {
 setTimeout(() => {
   if (!isDuplicate) {
     console.log('✅ This is the main tab.');
+    // Main tab will never submit the form!
   }
 }, 300);
 
