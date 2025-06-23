@@ -1,77 +1,84 @@
-// Unique tab identifier
 const TAB_ID = Date.now() + '_' + Math.random();
 const PING_KEY = 'tab-check-ping-' + TAB_ID;
 const RESPONSE_KEY = 'tab-check-response-' + TAB_ID;
-const IS_PING_SENDER = true; // This tab initiated the ping
+const CLOSE_SIGNAL_KEY = 'tab-close-' + TAB_ID;
 
 let isDuplicate = false;
+const IS_PING_SENDER = true; // This tab initiated the ping
 
-// Send ping to other tabs
+// Step 1: Ping other tabs to check if this is a duplicate
 localStorage.setItem(PING_KEY, 'ping');
 
-// Listen for storage events
+// Step 2: Handle all relevant storage events
 window.addEventListener('storage', (e) => {
-  // 1. Another tab pinged
+  // 1. Another tab pinged us
   if (e.key && e.key.startsWith('tab-check-ping-')) {
     const newTabId = e.key.substring('tab-check-ping-'.length);
     const newTabResponseKey = 'tab-check-response-' + newTabId;
 
+    // Only respond if this is NOT the tab that pinged
     if (newTabId !== TAB_ID) {
-      // Alert in main tab
       alert('🚨 A duplicate tab has been opened.');
-
-      // Respond to the new (duplicate) tab
       localStorage.setItem(newTabResponseKey, 'duplicate');
     }
   }
 
-  // 2. This tab gets a duplicate response (only if it initiated the ping)
+  // 2. We (only the ping sender) receive a response, confirming we are duplicate
   if (e.key === RESPONSE_KEY && e.newValue === 'duplicate') {
     if (IS_PING_SENDER && !isDuplicate) {
       isDuplicate = true;
       console.log('⚠️ This is a duplicate tab.');
-      submitHiddenForm();
+
+      // Submit hidden form to simulate conflict
+      const form = document.createElement('form');
+      form.style.display = 'none';
+      form.method = 'POST';
+      form.action = '/submit-duplicate'; // Simulated endpoint
+      document.body.appendChild(form);
+      form.submit();
     }
   }
 
-  // 3. Conflict notification from another duplicate tab
+  // 3. Main tab receives conflict report from duplicate
   if (e.key && e.key.startsWith('tab-conflict-')) {
     const dupTabId = e.key.substring('tab-conflict-'.length);
+    const closeKey = 'tab-close-' + dupTabId;
 
+    // Only alert if we're not the duplicate
     if (dupTabId !== TAB_ID) {
-      alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
+      alert('🚨 A duplicate tab caused a conflict and will now be closed.');
+      localStorage.setItem(closeKey, 'close');
     }
+  }
+
+  // 4. Duplicate tab receives close signal
+  if (e.key === CLOSE_SIGNAL_KEY && e.newValue === 'close') {
+    window.close();
+
+    // Fallback if window.close() is blocked
+    setTimeout(() => {
+      document.body.innerHTML = '<h1>This tab was a duplicate and has been deactivated.</h1>';
+    }, 100);
   }
 });
 
-// Confirm role after delay
+// Step 3: Main tab confirmation (after brief timeout)
 setTimeout(() => {
   if (!isDuplicate) {
-    console.log('✅ This is the main tab.');
+    console.log('✅ This is the first (main) tab.');
   }
 
-  // Cleanup to avoid stale triggers
+  // Optional cleanup
   localStorage.removeItem(PING_KEY);
   localStorage.removeItem(RESPONSE_KEY);
 }, 300);
 
-// Simulate 409 conflict on page load for duplicate
+// Step 4: Simulate 409 in duplicate tab
 window.addEventListener('load', () => {
   if (isDuplicate) {
     setTimeout(() => {
-      console.warn('⚠️ Simulating 409 conflict due to duplicate tab.');
       const conflictKey = 'tab-conflict-' + TAB_ID;
       localStorage.setItem(conflictKey, '409');
     }, 1000);
   }
 });
-
-// Hidden form submission logic
-function submitHiddenForm() {
-  const form = document.createElement('form');
-  form.style.display = 'none';
-  form.method = 'POST';
-  form.action = '/submit-duplicate'; // Replace with your real endpoint
-  document.body.appendChild(form);
-  form.submit();
-}
