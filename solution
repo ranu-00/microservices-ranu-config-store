@@ -1,62 +1,63 @@
+// Unique tab identifier
 const TAB_ID = Date.now() + '_' + Math.random();
 const PING_KEY = 'tab-check-ping-' + TAB_ID;
 const RESPONSE_KEY = 'tab-check-response-' + TAB_ID;
+const IS_PING_SENDER = true; // This tab initiated the ping
 
 let isDuplicate = false;
 
-// Ping other tabs to check if this is a duplicate
+// Send ping to other tabs
 localStorage.setItem(PING_KEY, 'ping');
 
-// Handle storage events
+// Listen for storage events
 window.addEventListener('storage', (e) => {
   // 1. Another tab pinged
   if (e.key && e.key.startsWith('tab-check-ping-')) {
     const newTabId = e.key.substring('tab-check-ping-'.length);
     const newTabResponseKey = 'tab-check-response-' + newTabId;
 
-    // Only respond if this is NOT the tab that just pinged (i.e., not the new tab itself)
     if (newTabId !== TAB_ID) {
-      // Show alert on main tab
+      // Alert in main tab
       alert('🚨 A duplicate tab has been opened.');
 
-      // Send response back to duplicate tab
+      // Respond to the new (duplicate) tab
       localStorage.setItem(newTabResponseKey, 'duplicate');
     }
   }
 
-  // 2. If we are the duplicate tab and receive a response
+  // 2. This tab gets a duplicate response (only if it initiated the ping)
   if (e.key === RESPONSE_KEY && e.newValue === 'duplicate') {
-    // Only the duplicate tab should run this logic for itself
-    if (!isDuplicate) {
+    if (IS_PING_SENDER && !isDuplicate) {
       isDuplicate = true;
       console.log('⚠️ This is a duplicate tab.');
       submitHiddenForm();
     }
   }
 
-  // 3. Main tab is notified that a conflict happened in the duplicate
+  // 3. Conflict notification from another duplicate tab
   if (e.key && e.key.startsWith('tab-conflict-')) {
     const dupTabId = e.key.substring('tab-conflict-'.length);
 
-    // Only alert if this is NOT the duplicate tab
     if (dupTabId !== TAB_ID) {
       alert('⚠️ A duplicate tab caused a conflict (409). You may want to close that tab.');
     }
   }
 });
 
-// Check after brief timeout to confirm if this is the main tab
+// Confirm role after delay
 setTimeout(() => {
   if (!isDuplicate) {
     console.log('✅ This is the main tab.');
-    // Main tab will never submit the form!
   }
+
+  // Cleanup to avoid stale triggers
+  localStorage.removeItem(PING_KEY);
+  localStorage.removeItem(RESPONSE_KEY);
 }, 300);
 
-// ➕ Simulate 409 response in duplicate tab after form submission
+// Simulate 409 conflict on page load for duplicate
 window.addEventListener('load', () => {
   if (isDuplicate) {
-    // Simulate 409 response using a timeout (replace with real check if needed)
     setTimeout(() => {
       console.warn('⚠️ Simulating 409 conflict due to duplicate tab.');
       const conflictKey = 'tab-conflict-' + TAB_ID;
@@ -65,7 +66,7 @@ window.addEventListener('load', () => {
   }
 });
 
-// 🔒 Hidden form submit logic
+// Hidden form submission logic
 function submitHiddenForm() {
   const form = document.createElement('form');
   form.style.display = 'none';
